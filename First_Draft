@@ -1,0 +1,117 @@
+Cobbler is now on github at http://cobbler.github.io
+
+*FIRST*: Decide how you want your system to be configured.  Create a kickstart file.  Put this in: '/var/lib/cobbler/kickstarts'.  Use the existing CentOS6.6.ks and CentOS6.7.ks files in that directory as examples.
+
+** Cobbler makes heavy use of var/lib and var/www.  Everything you need to configure in cobbler is located in one of these two directories.
+
+1. Install Cobbler - Easy.  Follow the instructions here: http://cobbler.github.io/manuals/quickstart/
+Once you get to the “Importing Your First Distribution” section, stop, and follow the rules below:
+
+2. Get the minimal version of CentOS that you need from the CentOS mirror page, and burn it to a disk.
+
+3. Mount an iso to the cobbler computer from a dvd using: 'mount -t iso9660 -o loop,ro /dev/sr0 /yourmntpoint'
+
+4. On the cobbler machine run: 'cobbler import —name=blahblah —path=/mnt/yourmntpoint'
+
+This will run and fail, because Cobbler does not support the importation of minimal installs.  But it will grab everything out of your mount point and put it into /var/www/cobbler/ks_mirror/blahblah.  It will not, however, create a distro and profile, so you still need to make those manually.  
+
+5.  Create a distribution.  This adds the kernel and initrd.  Run: 'cobbler distro add —name=blahblah --kernel=/var/www/cobbler/ks_mirror/blahblah/isolinux/vmlinuz --initrd=/var/www/cobbler/ks_mirror/blahblah/isolinux/initrd.img' 
+
+6. *NOTE*  Before you create a profile, you need a kickstart file.  So make sure you have one located in: '/var/lib/cobbler/kickstarts'…like I said at the beginning.
+ 
+Now create a profile, so that cobbler knows how to assoiciate all of the installation material you’ve just uploaded with your ks file.  Run: 'cobbler profile add —name=blahblah --kickstart=/var/lib/cobbler/kickstarts/blahblah.ks —distro=blahblah'
+
+7.  Run 'cobbler distro report' and 'cobbler profile report' to make sure that everything loaded ok.  You should see the proper kernel listed in the distro report and the proper ks file in the profile report.
+
+8.  Get everything synchronized.  Run the following commands: 
+
+cobbler sync
+service cobblerd restart
+
+These two commands need to be run in this order, every time you change something in a ks file or any other parameter in cobbler.  
+
+9.  Check everything.  Run: 'cobbler check'.  At this point you may run into two error messages, below, when you check cobbler.  
+
+"1 : some network boot-loaders are missing from /var/lib/cobbler/loaders, you may run 'cobbler get-loaders' to download them, or, if you only want to handle x86/x86_64 netbooting, you may ensure that you have installed a *recent* version of the syslinux package installed and can ignore this message entirely.  Files in this directory, should you want to support all architectures, should include pxelinux.0, menu.c32, elilo.efi, and yaboot. The 'cobbler get-loaders' command is the easiest way to resolve these requirements.
+2 : debmirror package is not installed, it will be required to manage debian deployments and repositories"
+
+Number two is not relevant (this is not a debian system).  If number one appears, you can manually grab the boot loaders, using wget, at https://github.com/cobbler/cobbler.github.io/tree/master/loaders.  Running 'cobbler get-loaders' usually fails.  You likely only need grub and pxelinux, which you will see on github.
+
+If you are just installing a new distribution on the cobbler server that Sarah built and this is not a brand new installation of cobbler itself, then don’t worry about this error.  Sarah already fixed the boot-loaders, but the message still appears since she left some loaders out that don’t apply.
+
+You’re done!
+
+Things to also note:
+
+Any time you make changes to cobbler, you need to run cobbler sync, and then service cobblerd restart.
+ 
+reposync uses .repo files in /var/www/cobbler/repo_mirror/.origin/ that are created by
+
+any time you change the kickstart file, you have to erase the current profile and create a new one.  then do a cobbler sync, and then service cobblerd restart
+
+if you redo a ks file and are not getting tftp to work after loading it (that is, your autoload stops at a prompt that asks you for your language), check the ks file again, since the ks is supposed to automatically do this.  it is corrupted in some way.  Either the lines you added were done in an editor that vi doesn’t like, or the quote marks are funny, or, there is some line in your code that cobbler hates.  And it will tell you exactly what in /var/log/cobbler/cobbler.log.
+
+anaconda looks for the install file http://cobbler/ks_mirror/name/images/install.img
+
+if you run cobbler-check and get the following, or if cobbler sync fails at the boot loaders:
+
+1 : some network boot-loaders are missing from /var/lib/cobbler/loaders, you may run 'cobbler get-loaders' to download them, or, if you only want to handle x86/x86_64 netbooting, you may ensure that you have installed a *recent* version of the syslinux package installed and can ignore this message entirely.  Files in this directory, should you want to support all architectures, should include pxelinux.0, menu.c32, elilo.efi, and yaboot. The 'cobbler get-loaders' command is the easiest way to resolve these requirements.
+
+(this could happen after a reboot, if you manually added in the boot loaders before)
+then….you need to get the boot loaders again from https://github.com/cobbler/cobbler.github.io/tree/master/loaders
+and then run cobbler sync.  
+
+
+> >> What would I need to do to manually replicate what `cobbler import`> >> does?...
+> > > > But, for the record, import is basically a wrapper around the following> > steps:> > > > cobbler distro add> > cobbler profile add> > cobbler repo add> > > > All of which might add more than one object.> > I have asked the same question before and got basically the same answer.> However I think it misses some details which you have to spelunk the> source code to find out, such as creating links, supplying the right> vmlinuz and initrd paths, etc....
+
+OK, got it!  Thanks again everyone for the pointers and examples.
+
+So what I was trying to achieve (which I probably didn't explain properly) was 
+to add a distro and repo without downloading the same data twice (once in DVD 
+ISO and once for repo).
+
+I finally got there after a couple of tries and it turned out the distro only 
+needs (at least for CentOS) 3 files that are not already in the repo mirror: 
+kernel, initrd and install.img (anaconda).
+
+In case it would be useful to anyone the steps are below (this is for CentOS 6 
+x86_64).
+
+So basically the idea is to download the needed files into a distro tree dir 
+(in /var/www/cobbler/ks_mirror) and link everything else (cache/ Packages/ 
+repodata/) that's needed for installation to the repo dir (in 
+/var/www/cobbler/repo_mirror).
+
+So far it seems to work well.  I'll probably revise that when I start adding 
+debian based distros.
+
+
+ 1. created a repo: cobbler repo add --name=centos-6-os-x86_64 --
+mirror=http://mirror.centos.org/centos/6/os/x86_64/ --priority=1 --arch=x86_64 
+&& cobbler reposync
+
+ 2. created a file: centos-6-ks-files with contents:
+
+images/install.img
+images/pxeboot/initrd.img
+images/pxeboot/vmlinuz
+
+ 3. mkdir /var/lib/cobbler/ks_mirror/centos-6-x86_64
+
+ 4. wget --base=http://mirror.centos.org/centos/6/os/x86_64/ --input-
+file=centos-6-ks-files --timestamping --force-directories --no-host-
+directories --directory-prefix=/var/lib/cobbler/ks_mirror/centos-6-x86_64 --
+cut-dirs=4
+
+ 5. for dir in cache Packages repodata; do ln -sf 
+/var/www/cobbler/repo_mirror/centos-6-os-x86_64/$dir 
+/var/www/cobbler/ks_mirror/centos-6-x86_64/$dir; done
+
+ 6. ln -sf /var/www/cobbler/ks_mirror/centos-6-x86_64 
+/var/www/cobbler/links/cobbler-6-x86_64
+
+ 7. cobbler distro add --name=centos-6-x86_64 --
+kernel=/var/www/cobbler/ks_mirror/centos-6-x86_64/images/pxeboot/vmlinuz --
+initrd=/var/www/cobbler/ks_mirror/centos-6-x86_64/images/pxeboot/initrd.img --
+ksmeta="tree=http://@@http_server@@/cblr/links/centos-6-x86_64"
