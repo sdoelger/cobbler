@@ -1,10 +1,11 @@
 Cobbler is now on github at http://cobbler.github.io
 
-*FIRST*: Decide how you want your system to be configured.  Create a kickstart file.  Put this in: '/var/lib/cobbler/kickstarts'.  Use the existing CentOS6.6.ks and CentOS6.7.ks files in that directory as examples.
+*FIRST*: Decide how you want your system to be configured, and create a kickstart file.  See Appendix A for how to create a CentOS kickstart file.  Put this file in: '/var/lib/cobbler/kickstarts'.  Use the existing CentOS6.6.ks and CentOS6.7.ks files in that directory as examples.
 
-** Cobbler makes heavy use of var/lib and var/www.  Everything you need to configure in cobbler is located in one of these two directories.
+** Cobbler makes heavy use of var/lib and var/www.  Everything you need to configure in cobbler is located in one of these two directories.  The former contains the configuration scripts, and the latter contains OS images and information.
 
-1. Install Cobbler - Easy.  Follow the instructions here: http://cobbler.github.io/manuals/quickstart/
+1. Install Cobbler - This invovles installing with yum and then importing a distribution and creating a profile in cobbler.  Follow the instructions here: http://cobbler.github.io/manuals/quickstart/, only as far as the “Importing Your First Distribution” section!
+
 Once you get to the “Importing Your First Distribution” section, stop, and follow the rules below:
 
 2. Get the minimal version of CentOS that you need from the CentOS mirror page, and burn it to a disk.
@@ -13,11 +14,11 @@ Once you get to the “Importing Your First Distribution” section, stop, and f
 
 4. On the cobbler machine run: 'cobbler import —name=blahblah —path=/mnt/yourmntpoint'
 
-This will run and fail, because Cobbler does not support the importation of minimal installs.  But it will grab everything out of your mount point and put it into /var/www/cobbler/ks_mirror/blahblah.  It will not, however, create a distro and profile, so you still need to make those manually.  
+This will run and fail, because Cobbler does not support the importation of minimal installs.  But regardless, it will grab everything out of your mount point and put it into /var/www/cobbler/ks_mirror/blahblah.  It will not, however, create a distro and profile, so you still need to make those manually.  
 
 5.  Create a distribution.  This adds the kernel and initrd.  Run: 'cobbler distro add —name=blahblah --kernel=/var/www/cobbler/ks_mirror/blahblah/isolinux/vmlinuz --initrd=/var/www/cobbler/ks_mirror/blahblah/isolinux/initrd.img' 
 
-6. *NOTE*  Before you create a profile, you need a kickstart file.  So make sure you have one located in: '/var/lib/cobbler/kickstarts'…like I said at the beginning.
+6. *NOTE*  Before you create a profile, you need a kickstart file.  So make sure you have one located in: '/var/lib/cobbler/kickstarts'…as mentioned in the beginning.
  
 Now create a profile, so that cobbler knows how to assoiciate all of the installation material you’ve just uploaded with your ks file.  Run: 'cobbler profile add —name=blahblah --kickstart=/var/lib/cobbler/kickstarts/blahblah.ks —distro=blahblah'
 
@@ -52,6 +53,8 @@ any time you change the kickstart file, you have to erase the current profile an
 if you redo a ks file and are not getting tftp to work after loading it (that is, your autoload stops at a prompt that asks you for your language), check the ks file again, since the ks is supposed to automatically do this.  it is corrupted in some way.  Either the lines you added were done in an editor that vi doesn’t like, or the quote marks are funny, or, there is some line in your code that cobbler hates.  And it will tell you exactly what in /var/log/cobbler/cobbler.log.
 
 anaconda looks for the install file http://cobbler/ks_mirror/name/images/install.img
+________________________________________________________________________________________________________________________________________
+RANDOM NOTES:
 
 if you run cobbler-check and get the following, or if cobbler sync fails at the boot loaders:
 
